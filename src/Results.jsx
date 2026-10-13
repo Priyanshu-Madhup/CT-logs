@@ -3,7 +3,7 @@ import { MODES, search, getCert } from './api.js'
 import { certStatus, fmtDate, isDigiCert, dnValue, countryName, countryFlag, orgDomain, groupOrgDomains, orgKey } from './util.js'
 import { StatusBadge, CopyBtn } from './components.jsx'
 import Logo from './Logo.jsx'
-import { Filters, Leaderboard, EMPTY_FILTERS, buildItems, applyFilters, exportRows } from './Insights.jsx'
+import { tldCountry, Filters, Leaderboard, EMPTY_FILTERS, buildItems, applyFilters, exportRows } from './Insights.jsx'
 
 export default function Results({ mode, q }) {
   const [rows, setRows] = useState([])
@@ -232,12 +232,14 @@ function IssuerCell({ info }) {
   )
 }
 
-function CountryCell({ info }) {
-  if (!info) return <span className="muted small" title="Use “Look up” below the table">—</span>
-  if (info.loading) return <span className="muted small">…</span>
-  if (info.error) return <span className="muted small">n/a</span>
-  if (!info.country) return <span className="muted small" title="Domain-validated certificates carry no subject country">—</span>
-  return <span title={info.country}>{countryFlag(info.country)} {countryName(info.country)}</span>
+function CountryCell({ info, host }) {
+  if (info?.loading) return <span className="muted small">…</span>
+  if (info && info.country) return <span title={`Certificate subject country (${info.country})`}>{countryName(info.country)}</span>
+  // Not looked up (or a DV certificate with no subject country): fall back to the country-code TLD.
+  const t = tldCountry(host)
+  if (t) return <span className="muted" title="From the domain's country-code TLD. Use “Look up” for the certificate's own country.">{countryName(t)} <span className="small">(.{host.split('.').pop()})</span></span>
+  if (info && !info.error) return <span className="muted small" title="Domain-validated certificates carry no subject country">—</span>
+  return <span className="muted small" title="Generic TLD — use “Look up” below the table">—</span>
 }
 
 function CertTable({ rows, org, issuers = {}, groups = {} }) {
@@ -284,7 +286,7 @@ function CertTable({ rows, org, issuers = {}, groups = {} }) {
                 <div className="sub">{r._st.key === 'expired' ? `${r._st.days}d ago` : `in ${r._st.days}d`}</div>
               </td>
               {!org && <td className="nowrap">{r.key_algo || '—'}</td>}
-              <td className="nowrap"><CountryCell info={issuers[r.id]} /></td>
+              <td className="nowrap"><CountryCell info={issuers[r.id]} host={org ? (r.domains || [])[0] || r.subject_cn || '' : r.match || ''} /></td>
               <td className="num">
                 {org ? <DomainSample r={r} /> : r.san_count ?? '—'}
               </td>
