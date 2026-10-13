@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { baseDomain, countryName, dnValue, orgKey, saveBlob } from './util.js'
+import { baseDomain, countryName, orgKey, saveBlob } from './util.js'
 import Logo from './Logo.jsx'
 
 export const EMPTY_FILTERS = { text: '', status: 'all', key: 'all', tld: 'all', country: 'all', issuer: 'all', org: 'all' }
@@ -26,7 +26,7 @@ export function buildItems(rows, issuers, org) {
         orgKey: org ? orgKey(r.match || r.subject_cn) : base,
         orgLabel: org ? r.match || r.subject_cn : base,
         orgDomain: base,
-        issuer: org ? (looked ? dnValue(info.dn, 'CN') : '') : r.issuer || '',
+        issuer: r.issuer || '', // org-search rows carry the issuer organisation too
         tld: tldCountry(host),
         country: looked ? info.country || '—' : undefined,
         key: r.key_algo || '',

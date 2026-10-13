@@ -162,7 +162,7 @@ export default function Results({ mode, q }) {
           {mode !== 'hosts' && mode !== 'bimi' && rows.length > issuerLimit && (
             <div className="more lookup">
               <p className="muted small">
-                Country{mode === 'org' ? ' and issuer are' : ' is'} not in the search results; each lookup is one extra API request
+                Country is not in the search results; each lookup is one extra API request
                 ({Math.min(issuerLimit, rows.length)} of {rows.length} done).
               </p>
               {issuerLimit < 15 && rows.length > 15 && <button className="btn btn-outline btn-sm" onClick={() => setIssuerLimit(15)}>Look up first 15</button>}{' '}
@@ -271,7 +271,7 @@ function CertTable({ rows, org, issuers = {}, groups = {} }) {
                 </div>
               </td>
               <td>
-                {org ? <IssuerCell info={issuers[r.id]} /> : (
+                {org && !r.issuer ? <IssuerCell info={issuers[r.id]} /> : (
                   <div className="namecell">
                     <Logo domain={orgDomain(r.issuer)} name={r.issuer} size={24} />
                     <div>{r.issuer}{isDigiCert(r.issuer) && <span className="badge brand">DigiCert</span>}</div>
