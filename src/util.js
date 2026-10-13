@@ -115,3 +115,26 @@ export function baseDomain(name) {
   const n = p[p.length - 2].length <= 3 && SLD.test(p[p.length - 2]) && p[p.length - 1].length === 2 ? 3 : 2
   return p.slice(-n).join('.')
 }
+
+// Known CA / CT-log-operator names -> website, so logos can be shown next to them.
+const ORG_SITES = [
+  [/digicert/i, 'digicert.com'], [/let'?s encrypt|isrg/i, 'letsencrypt.org'], [/sectigo|comodo/i, 'sectigo.com'],
+  [/globalsign/i, 'globalsign.com'], [/godaddy|starfield/i, 'godaddy.com'], [/amazon/i, 'amazon.com'],
+  [/google/i, 'google.com'], [/cloudflare/i, 'cloudflare.com'], [/microsoft/i, 'microsoft.com'],
+  [/entrust/i, 'entrust.com'], [/zerossl|apilayer/i, 'zerossl.com'], [/buypass/i, 'buypass.com'],
+  [/ssl\.com/i, 'ssl.com'], [/actalis/i, 'actalis.com'], [/certum|asseco/i, 'certum.pl'],
+  [/identrust/i, 'identrust.com'], [/geotrust/i, 'geotrust.com'], [/thawte/i, 'thawte.com'],
+  [/rapidssl/i, 'rapidssl.com'], [/telia/i, 'telia.com'], [/harica/i, 'harica.gr'],
+  [/trustasia/i, 'trustasia.com'], [/sslcorp/i, 'ssl.com'], [/geomys|sunlight/i, 'geomys.org'],
+  [/gts|trust services/i, 'pki.goog'], [/ssl\.?com/i, 'ssl.com'], [/swisssign/i, 'swisssign.com'],
+  [/e-?tugra/i, 'etugra.com.tr'], [/hongkong post/i, 'hongkongpost.gov.hk'], [/izenpe/i, 'izenpe.com'],
+  [/fnmt/i, 'fnmt.es'], [/camerfirma/i, 'camerfirma.com'], [/digidentity/i, 'digidentity.eu'],
+]
+export function orgDomain(...names) {
+  for (const n of names) {
+    if (!n) continue
+    const hit = ORG_SITES.find(([re]) => re.test(n))
+    if (hit) return hit[1]
+  }
+  return ''
+}

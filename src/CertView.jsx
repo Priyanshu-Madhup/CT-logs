@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getCert, downloadCert } from './api.js'
 import {
-  certStatus, fmtDate, lifetimeDays, parseDN, dnLabel, dnValue, isDigiCert, policyName, countryName, countryFlag, validationLevel, saveBlob, groupHex,
+  certStatus, fmtDate, lifetimeDays, parseDN, dnLabel, dnValue, isDigiCert, policyName, countryName, countryFlag, orgDomain, validationLevel, saveBlob, groupHex,
 } from './util.js'
 import { CopyBtn, StatusBadge } from './components.jsx'
 import Logo from './Logo.jsx'
@@ -115,7 +115,10 @@ function Detail({ cert: c, showJson, setShowJson }) {
           </div>
           {subjO && <p className="banner-org">{subjO}</p>}
           {country && <p className="banner-issuer">{countryFlag(country)} {countryName(country)}</p>}
-          <p className="banner-issuer">Issued by <b>{issuerCN || c.issuer_dn}</b></p>
+          <p className="banner-issuer namecell">
+            <Logo domain={orgDomain(c.issuer_dn)} name={issuerCN} size={24} />
+            <span>Issued by <b>{issuerCN || c.issuer_dn}</b></span>
+          </p>
         </div>
         <div className="banner-days">
           <b>{st.days}</b>
@@ -132,8 +135,14 @@ function Detail({ cert: c, showJson, setShowJson }) {
       </div>
 
       <div className="grid2">
-        <Section title="Subject"><Dn dn={c.subject_dn} /></Section>
-        <Section title="Issuer"><Dn dn={c.issuer_dn} /></Section>
+        <Section title="Subject">
+          <div className="namecell dn-head"><Logo domain={c.subject_cn && c.subject_cn.includes('.') ? c.subject_cn : (c.san_dns || [])[0]} name={subjO || c.subject_cn} size={36} /><b>{subjO || c.subject_cn}</b></div>
+          <Dn dn={c.subject_dn} />
+        </Section>
+        <Section title="Issuer">
+          <div className="namecell dn-head"><Logo domain={orgDomain(c.issuer_dn)} name={issuerCN} size={36} /><b>{dnValue(c.issuer_dn, 'O') || issuerCN}</b></div>
+          <Dn dn={c.issuer_dn} />
+        </Section>
       </div>
 
       <Section title="Certificate">
@@ -189,6 +198,7 @@ function Detail({ cert: c, showJson, setShowJson }) {
             <ul className="sans">
               {shownSans.slice(0, 500).map((s) => (
                 <li key={s}>
+                  <Logo domain={s} name={s} size={18} />
                   <a href={`#/s/domain/${encodeURIComponent(s)}`} title="Find certificates for this name">{s}</a>
                 </li>
               ))}
@@ -208,7 +218,7 @@ function Detail({ cert: c, showJson, setShowJson }) {
               <tbody>
                 {c.sightings.map((s, i) => (
                   <tr key={i}>
-                    <td>{s.operator || '—'}</td>
+                    <td><span className="namecell"><Logo domain={orgDomain(s.operator, s.log_url)} name={s.operator} size={20} />{s.operator || '—'}</span></td>
                     <td className="mono small wrap-any">{s.log_url ? <a href={s.log_url} target="_blank" rel="noreferrer">{s.log_url.replace(/^https?:\/\//, '')}</a> : s.log_id}</td>
                     <td><span className="pill">{s.is_precert ? 'Precertificate' : 'Final'}</span></td>
                     <td className="num mono small">{s.entry_idx?.toLocaleString?.() ?? s.entry_idx}</td>

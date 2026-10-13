@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MODES, search, getCert } from './api.js'
-import { certStatus, fmtDate, isDigiCert, dnValue, countryName, countryFlag } from './util.js'
+import { certStatus, fmtDate, isDigiCert, dnValue, countryName, countryFlag, orgDomain } from './util.js'
 import { StatusBadge, CopyBtn } from './components.jsx'
 import Logo from './Logo.jsx'
 
@@ -233,7 +233,12 @@ function IssuerCell({ info }) {
   if (!info) return <span className="muted small">Loading…</span>
   if (info.error) return <span className="muted small">Unavailable</span>
   const cn = dnValue(info.dn, 'CN') || info.dn
-  return <>{cn}{isDigiCert(info.dn) && <span className="badge brand">DigiCert</span>}<div className="sub">{dnValue(info.dn, 'O')}</div></>
+  return (
+    <div className="namecell">
+      <Logo domain={orgDomain(info.dn)} name={cn} size={24} />
+      <div>{cn}{isDigiCert(info.dn) && <span className="badge brand">DigiCert</span>}<div className="sub">{dnValue(info.dn, 'O')}</div></div>
+    </div>
+  )
 }
 
 function CountryCell({ info }) {
@@ -275,7 +280,10 @@ function CertTable({ rows, org, issuers = {} }) {
               </td>
               <td>
                 {org ? <IssuerCell info={issuers[r.id]} /> : (
-                  <>{r.issuer}{isDigiCert(r.issuer) && <span className="badge brand">DigiCert</span>}</>
+                  <div className="namecell">
+                    <Logo domain={orgDomain(r.issuer)} name={r.issuer} size={24} />
+                    <div>{r.issuer}{isDigiCert(r.issuer) && <span className="badge brand">DigiCert</span>}</div>
+                  </div>
                 )}
               </td>
               <td className="nowrap">{fmtDate(r.not_before)}</td>
@@ -353,7 +361,7 @@ function BimiList({ rows }) {
               </div>
               <p className="sub">{(r.domains || []).join(', ')}</p>
               <dl className="kv compact">
-                <dt>Issuer</dt><dd>{dnValue(r.issuer_dn, 'CN') || r.issuer_dn}</dd>
+                <dt>Issuer</dt><dd><span className="namecell"><Logo domain={orgDomain(r.issuer_dn)} name={dnValue(r.issuer_dn, 'CN')} size={20} />{dnValue(r.issuer_dn, 'CN') || r.issuer_dn}</span></dd>
                 <dt>Validity</dt><dd>{fmtDate(r.not_before)} → {fmtDate(r.not_after)}</dd>
                 <dt>Mark type</dt><dd>{r.mark_type || '—'}{r.word_mark ? ` · “${r.word_mark}”` : ''}</dd>
                 {r.trademark_registration && <><dt>Trademark</dt><dd>{r.trademark_country} #{r.trademark_registration}</dd></>}

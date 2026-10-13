@@ -298,3 +298,8 @@ h1, h2, h3 { color: var(--ink); margin: 0; }
 .logo-fallback { display: inline-grid; place-items: center; background: var(--blue-light); color: var(--blue); font-weight: 800; }
 .namecell { display: flex; align-items: center; gap: 12px; }
 .cn-row { display: flex; align-items: center; gap: 14px; }
+
+.dn-head { margin-bottom: 10px; color: var(--ink); }
+.sans li { display: flex; align-items: center; gap: 8px; }
+.logo[width], .namecell .logo { flex: none; }
+.banner-issuer.namecell { gap: 8px; }
