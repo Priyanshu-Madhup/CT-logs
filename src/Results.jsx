@@ -3,6 +3,7 @@ import { MODES, search, getCert } from './api.js'
 import { certStatus, fmtDate, isDigiCert, dnValue, countryName, countryFlag, orgDomain, groupOrgDomains, orgKey } from './util.js'
 import { StatusBadge, CopyBtn } from './components.jsx'
 import Logo from './Logo.jsx'
+import { Filters, Leaderboard, EMPTY_FILTERS, buildItems, applyFilters, exportRows } from './Insights.jsx'
 
 export default function Results({ mode, q }) {
   const [rows, setRows] = useState([])
@@ -11,12 +12,10 @@ export default function Results({ mode, q }) {
   const [more, setMore] = useState(false)
   const [err, setErr] = useState(null)
   const [remaining, setRemaining] = useState(null)
-  const [filter, setFilter] = useState('')
-  const [status, setStatus] = useState('all')
+  const [f, setF] = useState(EMPTY_FILTERS)
   const alive = useRef(true)
   const [issuers, setIssuers] = useState({}) // id -> { dn } | { error }
   const [issuerLimit, setIssuerLimit] = useState(0)
-  const [country, setCountry] = useState('all')
   const fetching = useRef(new Set())
   const started = useRef(false)
   const [auto, setAuto] = useState(false)  // fetch every remaining page (opt-in: costs one request per page)
@@ -93,21 +92,15 @@ export default function Results({ mode, q }) {
 
   const orgGroups = useMemo(() => (mode === 'org' ? groupOrgDomains(rows) : {}), [rows, mode])
 
+  const certMode = !isHosts && !isBimi
+  const items = useMemo(() => (certMode ? buildItems(enriched, issuers, mode === 'org') : []), [enriched, issuers, mode, certMode])
+  const filtered = useMemo(() => applyFilters(items, f), [items, f])
+  const hasLookup = items.some((i) => i.m.country !== undefined)
   const shown = useMemo(() => {
-    const f = filter.trim().toLowerCase()
-    return enriched.filter((r) => {
-      if (status !== 'all' && r._st && r._st.key !== status) return false
-      if (country !== 'all' && issuers[r.id]?.country !== country) return false
-      if (!f) return true
-      return JSON.stringify(Object.values(r)).toLowerCase().includes(f)
-    })
-  }, [enriched, filter, status, country, issuers])
-
-  const countries = useMemo(() => {
-    const m = {}
-    Object.values(issuers).forEach((i) => { if (i.dn !== undefined) { const c = i.country || '—'; m[c] = (m[c] || 0) + 1 } })
-    return Object.entries(m).sort((a, b) => b[1] - a[1])
-  }, [issuers])
+    if (certMode) return filtered.map((i) => i.r)
+    const t = f.text.trim().toLowerCase()
+    return t ? enriched.filter((x) => JSON.stringify(Object.values(x)).toLowerCase().includes(t)) : enriched
+  }, [certMode, filtered, enriched, f.text])
 
   return (
     <section>
@@ -146,35 +139,19 @@ export default function Results({ mode, q }) {
               <Stat n={stats.issuers} l="Distinct issuers" />
             </div>
           )}
-          {countries.length > 0 && (
-            <div className="card countries">
-              <div className="countries-head"><b>By subject country</b><span className="muted small">{countries.reduce((a, [, n]) => a + n, 0)} of {rows.length} certificates looked up</span></div>
-              {countries.map(([c, n]) => (
-                <button key={c} className={`crow ${country === c ? 'on' : ''}`} onClick={() => setCountry(country === c ? 'all' : c)}>
-                  <span className="cname">{c === '—' ? 'No country (DV)' : `${countryFlag(c)} ${countryName(c)}`}</span>
-                  <span className="cbar"><i style={{ width: `${(n / countries[0][1]) * 100}%` }} /></span>
-                  <span className="cnum">{n}</span>
-                </button>
-              ))}
-            </div>
+          {rows.length > 0 && certMode && (
+            <>
+              <Filters items={items} f={f} setF={setF} stats={stats} hasLookup={hasLookup} />
+              <Leaderboard items={items} f={f} setF={setF} org={mode === 'org'} hasLookup={hasLookup} />
+              <div className="table-meta">
+                <span className="muted small">Showing {filtered.length} of {rows.length} certificates</span>
+                <button className="btn btn-outline btn-sm" onClick={() => exportRows(filtered)}>Download CSV</button>
+              </div>
+            </>
           )}
-          {rows.length > 0 && (
+          {rows.length > 0 && !certMode && (
             <div className="toolbar">
-              <input className="input" placeholder="Filter loaded results…" value={filter} onChange={(e) => setFilter(e.target.value)} />
-              {stats && (
-                <select className="input select" value={status} onChange={(e) => setStatus(e.target.value)}>
-                  <option value="all">All statuses</option>
-                  <option value="valid">Valid</option>
-                  <option value="expiring">Expiring soon</option>
-                  <option value="expired">Expired</option>
-                </select>
-              )}
-              {countries.length > 0 && (
-                <select className="input select" value={country} onChange={(e) => setCountry(e.target.value)}>
-                  <option value="all">All countries</option>
-                  {countries.map(([c, n]) => <option key={c} value={c}>{c === '—' ? 'No country (DV)' : `${countryFlag(c)} ${countryName(c)}`} ({n})</option>)}
-                </select>
-              )}
+              <input className="input" placeholder="Filter loaded results…" value={f.text} onChange={(e) => setF({ ...f, text: e.target.value })} />
             </div>
           )}
 
