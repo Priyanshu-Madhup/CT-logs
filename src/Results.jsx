@@ -127,8 +127,6 @@ export default function Results({ mode, q }) {
         {state === 'done' && (
           <p className="muted small">
             {rows.length} loaded{page.hasNext ? '+' : ' (all)'}
-            {page.ms != null && <> · {page.ms} ms</>}
-            {remaining != null && <> · {remaining} requests left</>}
           </p>
         )}
       </div>
@@ -141,7 +139,7 @@ export default function Results({ mode, q }) {
           {page.window && (
             <div className="alert alert-info">
               Showing certificates valid now or expired within the last {page.window} days.
-              {page.truncated && ' Older certificates exist in the Pro archive.'}
+              
             </div>
           )}
           {stats && rows.length > 0 && (
@@ -177,7 +175,7 @@ export default function Results({ mode, q }) {
           {mode !== 'hosts' && mode !== 'bimi' && rows.length > issuerLimit && (
             <div className="more lookup">
               <p className="muted small">
-                Country is not in the search results; each lookup is one extra API request
+                Certificate country isn't part of the search results, so it's looked up one certificate at a time
                 ({Math.min(issuerLimit, rows.length)} of {rows.length} done).
               </p>
               {issuerLimit < 15 && rows.length > 15 && <button className="btn btn-outline btn-sm" onClick={() => setIssuerLimit(15)}>Look up first 15</button>}{' '}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { MODES, getKey } from './api.js'
+import { MODES } from './api.js'
 import { goSearch } from './util.js'
-import { Header, Footer, SearchBox, SettingsModal } from './components.jsx'
+import { Header, Footer, SearchBox } from './components.jsx'
 import Results from './Results.jsx'
 import CertView from './CertView.jsx'
 
@@ -25,8 +25,6 @@ const EXAMPLES = [
 
 export default function App() {
   const [route, setRoute] = useState(parseHash)
-  const [settings, setSettings] = useState(false)
-  const [hasKey, setHasKey] = useState(() => !!getKey())
 
   useEffect(() => {
     const on = () => { setRoute(parseHash()); window.scrollTo(0, 0) }
@@ -38,7 +36,7 @@ export default function App() {
 
   return (
     <>
-      <Header hasKey={hasKey} onSettings={() => setSettings(true)} />
+      <Header />
       <section className={`hero ${home ? 'hero-big' : ''}`}>
         <div className="wrap">
           {home && (
@@ -76,7 +74,6 @@ export default function App() {
       </main>
 
       <Footer />
-      {settings && <SettingsModal onClose={() => setSettings(false)} onChange={setHasKey} />}
     </>
   )
 }
@@ -86,7 +83,7 @@ function HomeInfo() {
     ['Full certificate detail', 'Subject and issuer, SANs, validity window, key and signature algorithms, policies, fingerprints and every CT log sighting.'],
     ['Subdomain discovery', 'Enumerate every hostname with a valid or recently expired certificate, with first/last seen dates.'],
     ['Organization & BIMI', 'Find certificates by subject organization and browse Verified / Common Mark certificates with their logos.'],
-    ['Straight from the logs', 'Data comes live from the ctlogs.dev index of public Certificate Transparency logs. No account needed.'],
+    ['Straight from the logs', 'Data comes live from the public Certificate Transparency logs. No account needed.'],
   ]
   return (
     <section className="features">

@@ -9,7 +9,6 @@ import Logo from './Logo.jsx'
 export default function CertView({ id }) {
   const [cert, setCert] = useState(null)
   const [err, setErr] = useState(null)
-  const [showJson, setShowJson] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -27,7 +26,7 @@ export default function CertView({ id }) {
     )
   }
   if (!cert) return <div className="skeleton"><div className="sk-row tall" /><div className="sk-row" /><div className="sk-row" /><div className="sk-row" /></div>
-  return <Detail cert={cert} showJson={showJson} setShowJson={setShowJson} />
+  return <Detail cert={cert} />
 }
 
 function Section({ title, children, right }) {
@@ -62,7 +61,7 @@ function Dn({ dn }) {
   )
 }
 
-function Detail({ cert: c, showJson, setShowJson }) {
+function Detail({ cert: c }) {
   const st = certStatus(c.not_before, c.not_after)
   const total = lifetimeDays(c.not_before, c.not_after)
   const pct = Math.min(100, Math.max(0, ((Date.now() - Date.parse(c.not_before)) / (Date.parse(c.not_after) - Date.parse(c.not_before))) * 100))
@@ -241,20 +240,13 @@ function Detail({ cert: c, showJson, setShowJson }) {
             ))}
           </div>
         ) : (
-          <p className="muted small">Raw certificate bodies are archived for 7 days after first sighting; this one is no longer available. Fetch it from the CT log listed above.</p>
+          <p className="muted small">The certificate file is only kept for 7 days after it first appears, so it is no longer available to download.</p>
         )}
         {dl.err && <div className="alert alert-err">{dl.err}</div>}
         <div className="links">
           <a href={`https://ctlogs.dev/cert/${c.id}`} target="_blank" rel="noreferrer">View on ctlogs.dev ↗</a>
           <a href={`https://crt.sh/?q=${c.final_sha256 || c.precert_sha256 || ''}`} target="_blank" rel="noreferrer">Search on crt.sh ↗</a>
-          <button className="linkbtn" onClick={() => setShowJson(!showJson)}>{showJson ? 'Hide' : 'Show'} raw JSON</button>
         </div>
-        {showJson && (
-          <div className="json">
-            <CopyBtn text={JSON.stringify(c, null, 2)} label="Copy JSON" />
-            <pre>{JSON.stringify(c, null, 2)}</pre>
-          </div>
-        )}
       </Section>
     </div>
   )

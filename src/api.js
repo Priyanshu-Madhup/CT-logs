@@ -1,14 +1,7 @@
 export const BASE = 'https://api.ctlogs.dev'
-const KEY_STORE = 'ct_api_key'
-
-// Key priority: one saved in the browser via Settings, else CTLOGS_KEY (or CTLOGS_API_KEY) from the build environment.
+// Optional key supplied at build time (CTLOGS_KEY / CTLOGS_API_KEY).
 const ENV_KEY = import.meta.env.CTLOGS_KEY || import.meta.env.CTLOGS_API_KEY || ''
-export function getKey() {
-  try { return localStorage.getItem(KEY_STORE) || ENV_KEY } catch { return ENV_KEY }
-}
-export function setKey(k) {
-  try { k ? localStorage.setItem(KEY_STORE, k) : localStorage.removeItem(KEY_STORE) } catch { /* ignore */ }
-}
+export const getKey = () => ENV_KEY
 
 export class ApiError extends Error {
   constructor(message, status) { super(message); this.status = status }
@@ -28,7 +21,7 @@ async function run(path, params, raw) {
     try {
       res = await fetch(url, { headers })
     } catch {
-      throw new ApiError('Network error — could not reach api.ctlogs.dev.', 0)
+      throw new ApiError('Could not reach the certificate service. Check your connection and try again.', 0)
     }
     if ((res.status === 429 || res.status === 503) && attempt < 3) {
       const wait = Number(res.headers.get('Retry-After'))
@@ -37,10 +30,14 @@ async function run(path, params, raw) {
     }
     const remaining = res.headers.get('X-Hourly-Remaining') ?? res.headers.get('X-RateLimit-Remaining')
     if (!res.ok) {
-      let msg = `Request failed (${res.status})`
-      try { const j = await res.json(); if (j.error) msg = j.error } catch { /* ignore */ }
-      if (res.status === 429 && !/one request/.test(msg)) msg += ' — add an API key in Settings for more quota.'
-      throw new ApiError(msg, res.status)
+      const friendly = {
+        400: "That doesn't look like a valid search. Please check it and try again.",
+        403: "That search can't go any further right now.",
+        404: 'Nothing was found for that search.',
+        429: "We're getting a lot of searches right now. Please try again in a little while.",
+        503: 'The service is busy. Please try again shortly.',
+      }
+      throw new ApiError(friendly[res.status] || 'Something went wrong. Please try again.', res.status)
     }
     if (raw) return { blob: await res.blob(), remaining }
     const data = await res.json()
@@ -59,7 +56,7 @@ export const MODES = {
   subdomains: { label: 'Subdomains', ph: 'digicert.com', hint: 'Certificates for a domain and every name under it', path: (q) => `/v1/subdomains/${enc(q)}` },
   domain: { label: 'Exact domain', ph: 'www.digicert.com', hint: 'Certificates naming exactly this hostname', path: (q) => `/v1/domain/${enc(q)}` },
   hosts: { label: 'Host finder', ph: 'digicert.com', hint: 'One row per hostname with certificate counts', path: (q) => `/v1/hosts/${enc(q)}` },
-  org: { label: 'Organization', ph: 'DigiCert', hint: 'Certificates by subject organization (costs 10 credits)', path: () => '/v1/org', params: (q) => ({ q }) },
+  org: { label: 'Organization', ph: 'DigiCert', hint: 'Certificates by subject organization', path: () => '/v1/org', params: (q) => ({ q }) },
   serial: { label: 'Serial', ph: '0624d0ab311558780b7d5213b9631831', hint: 'Find certificates by serial number (hex)', path: (q) => `/v1/serial/${enc(q)}` },
   cert: { label: 'Fingerprint / ID', ph: 'SHA-256 fingerprint or certificate id', hint: 'Open the full record of one certificate', path: (q) => `/v1/cert/${enc(q)}` },
   bimi: { label: 'BIMI marks', ph: 'cnn.com or organization', hint: 'Verified / Common Mark Certificates', path: () => '/v1/bimi', params: (q) => ({ q }) },
@@ -70,5 +67,4 @@ export function search(mode, q, after) {
   return request(m.path(q), { ...(m.params ? m.params(q) : {}), after })
 }
 export const getCert = (id) => request(`/v1/cert/${enc(id)}`)
-export const getUsage = () => request('/v1/usage')
 export const downloadCert = (id, file) => request(`/v1/cert/${enc(id)}/${file}`, {}, true)
