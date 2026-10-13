@@ -139,3 +139,30 @@ export function orgDomain(...names) {
   }
   return ''
 }
+
+// Normalised organisation key: "AXIS BANK LIMITED" and "Axis Bank Ltd." -> "axisbank"
+export function orgKey(name) {
+  return (name || '').toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .replace(/\b(limited|ltd|inc|llc|llp|plc|corp|corporation|co|company|pvt|private|gmbh|sa|ag|bv|nv)\b/g, ' ')
+    .replace(/\s+/g, '')
+}
+
+// For rows of one organisation search: org key -> its domains, most frequent registrable domain first.
+export function groupOrgDomains(rows) {
+  const g = {}
+  rows.forEach((r, idx) => {
+    const k = orgKey(r.match || r.subject_cn)
+    if (!k) return
+    const e = (g[k] ||= new Map())
+    ;[...(r.domains || []), r.subject_cn].forEach((d) => {
+      const b = baseDomain(d)
+      if (b) e.set(b, { n: (e.get(b)?.n || 0) + 1, first: e.get(b)?.first ?? idx })
+    })
+  })
+  const out = {}
+  Object.entries(g).forEach(([k, m]) => {
+    out[k] = [...m.entries()].sort((a, b) => b[1].n - a[1].n || a[1].first - b[1].first).map(([d]) => d)
+  })
+  return out
+}

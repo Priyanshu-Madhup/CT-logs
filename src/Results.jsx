@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MODES, search, getCert } from './api.js'
-import { certStatus, fmtDate, isDigiCert, dnValue, countryName, countryFlag, orgDomain } from './util.js'
+import { certStatus, fmtDate, isDigiCert, dnValue, countryName, countryFlag, orgDomain, groupOrgDomains, orgKey } from './util.js'
 import { StatusBadge, CopyBtn } from './components.jsx'
 import Logo from './Logo.jsx'
 
@@ -91,6 +91,8 @@ export default function Results({ mode, q }) {
     return { ...c, issuers: issuers.size }
   }, [enriched, isHosts, isBimi])
 
+  const orgGroups = useMemo(() => (mode === 'org' ? groupOrgDomains(rows) : {}), [rows, mode])
+
   const shown = useMemo(() => {
     const f = filter.trim().toLowerCase()
     return enriched.filter((r) => {
@@ -179,7 +181,7 @@ export default function Results({ mode, q }) {
           {rows.length === 0 && <div className="empty">No certificates found for “{q}”.</div>}
           {rows.length > 0 && isHosts && <HostsTable rows={shown} />}
           {rows.length > 0 && isBimi && <BimiList rows={shown} />}
-          {rows.length > 0 && !isHosts && !isBimi && <CertTable rows={shown} org={mode === 'org'} issuers={issuers} />}
+          {rows.length > 0 && !isHosts && !isBimi && <CertTable rows={shown} org={mode === 'org'} issuers={issuers} groups={orgGroups} />}
           {mode !== 'hosts' && mode !== 'bimi' && rows.length > issuerLimit && (
             <div className="more lookup">
               <p className="muted small">
@@ -261,7 +263,7 @@ function CountryCell({ info }) {
   return <span title={info.country}>{countryFlag(info.country)} {countryName(info.country)}</span>
 }
 
-function CertTable({ rows, org, issuers = {} }) {
+function CertTable({ rows, org, issuers = {}, groups = {} }) {
   return (
     <div className="table-wrap">
       <table className="table">
@@ -284,7 +286,7 @@ function CertTable({ rows, org, issuers = {} }) {
               <td><StatusBadge status={r._st} /></td>
               <td className="name">
                 <div className="namecell">
-                  <Logo domain={org ? [...(r.domains || []), r.subject_cn] : r.match} name={r.match || r.subject_cn} />
+                  <Logo domain={org ? groups[orgKey(r.match || r.subject_cn)] || r.domains : r.match} group={org ? orgKey(r.match || r.subject_cn) : undefined} name={r.match || r.subject_cn} />
                   <div>
                     <a href={`#/c/${r.id}`} onClick={(e) => e.stopPropagation()}>{r.match || r.subject_cn}</a>
                     {org && r.subject_cn && r.subject_cn !== r.match && <div className="sub">{r.subject_cn}</div>}
