@@ -285,3 +285,16 @@ h1, h2, h3 { color: var(--ink); margin: 0; }
 .brand-name b { color: var(--blue); font-weight: 800; }
 .footer-brand { color: #fff; }
 .footer-brand b { color: #6cc2ff; }
+
+.countries { padding: 16px 20px; margin-bottom: 18px; }
+.countries-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; color: var(--ink); flex-wrap: wrap; }
+.crow { display: grid; grid-template-columns: minmax(130px, 220px) 1fr 40px; align-items: center; gap: 12px; width: 100%; background: none; border: 0; padding: 5px 6px; border-radius: 6px; cursor: pointer; font: inherit; color: var(--ink); text-align: left; }
+.crow:hover, .crow.on { background: var(--blue-light); }
+.cbar { height: 8px; background: #e6f2fb; border-radius: 4px; overflow: hidden; }
+.cbar i { display: block; height: 100%; background: var(--blue); border-radius: 4px; }
+.cnum { text-align: right; font-weight: 600; }
+
+.logo { border-radius: 8px; background: #fff; border: 1px solid var(--line); object-fit: contain; flex: none; }
+.logo-fallback { display: inline-grid; place-items: center; background: var(--blue-light); color: var(--blue); font-weight: 800; }
+.namecell { display: flex; align-items: center; gap: 12px; }
+.cn-row { display: flex; align-items: center; gap: 14px; }

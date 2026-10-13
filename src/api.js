@@ -1,8 +1,9 @@
 export const BASE = 'https://api.ctlogs.dev'
 const KEY_STORE = 'ct_api_key'
 
+// Key priority: one saved in the browser via Settings, else CTLOGS_KEY from the build environment.
 export function getKey() {
-  try { return localStorage.getItem(KEY_STORE) || '' } catch { return '' }
+  try { return localStorage.getItem(KEY_STORE) || import.meta.env.CTLOGS_KEY || '' } catch { return import.meta.env.CTLOGS_KEY || '' }
 }
 export function setKey(k) {
   try { k ? localStorage.setItem(KEY_STORE, k) : localStorage.removeItem(KEY_STORE) } catch { /* ignore */ }

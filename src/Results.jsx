@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MODES, search, getCert } from './api.js'
-import { certStatus, fmtDate, isDigiCert, dnValue } from './util.js'
+import { certStatus, fmtDate, isDigiCert, dnValue, countryName, countryFlag } from './util.js'
 import { StatusBadge, CopyBtn } from './components.jsx'
+import Logo from './Logo.jsx'
 
 export default function Results({ mode, q }) {
   const [rows, setRows] = useState([])
@@ -15,7 +16,10 @@ export default function Results({ mode, q }) {
   const alive = useRef(true)
   const [issuers, setIssuers] = useState({}) // id -> { dn } | { error }
   const [issuerLimit, setIssuerLimit] = useState(15)
+  const [country, setCountry] = useState('all')
   const fetching = useRef(new Set())
+  const [auto, setAuto] = useState(true)   // keep fetching pages until exhausted
+  const stopRef = useRef(false)
 
   const load = async (after) => {
     after ? setMore(true) : setState('loading')
@@ -46,14 +50,20 @@ export default function Results({ mode, q }) {
     return () => { alive.current = false }
   }, [])
 
-  // Org search rows carry no issuer, so look it up per certificate (1 credit each).
+  // Fetch every page automatically (stoppable). Keyless callers are capped by the API at 10 pages.
   useEffect(() => {
-    if (mode !== 'org') return
+    if (state !== 'done' || !auto || !page.hasNext || more || err || stopRef.current) return
+    load(page.cursor)
+  }, [state, auto, page, more, err])
+
+  // Subject country (and, for org search, the issuer) live only in the full record: look up per certificate (1 credit each).
+  useEffect(() => {
+    if (mode === 'hosts' || mode === 'bimi') return
     rows.slice(0, issuerLimit).forEach((r) => {
       if (fetching.current.has(r.id)) return
       fetching.current.add(r.id)
       getCert(r.id)
-        .then(({ data }) => alive.current && setIssuers((p) => ({ ...p, [r.id]: { dn: data.issuer_dn } })))
+        .then(({ data }) => alive.current && setIssuers((p) => ({ ...p, [r.id]: { dn: data.issuer_dn, country: dnValue(data.subject_dn, 'C') } })))
         .catch(() => alive.current && setIssuers((p) => ({ ...p, [r.id]: { error: true } })))
     })
   }, [rows, issuerLimit, mode])
@@ -83,10 +93,17 @@ export default function Results({ mode, q }) {
     const f = filter.trim().toLowerCase()
     return enriched.filter((r) => {
       if (status !== 'all' && r._st && r._st.key !== status) return false
+      if (country !== 'all' && issuers[r.id]?.country !== country) return false
       if (!f) return true
       return JSON.stringify(Object.values(r)).toLowerCase().includes(f)
     })
-  }, [enriched, filter, status])
+  }, [enriched, filter, status, country, issuers])
+
+  const countries = useMemo(() => {
+    const m = {}
+    Object.values(issuers).forEach((i) => { if (i.dn !== undefined) { const c = i.country || '—'; m[c] = (m[c] || 0) + 1 } })
+    return Object.entries(m).sort((a, b) => b[1] - a[1])
+  }, [issuers])
 
   return (
     <section>
@@ -97,7 +114,7 @@ export default function Results({ mode, q }) {
         </div>
         {state === 'done' && (
           <p className="muted small">
-            {rows.length} loaded{page.hasNext ? '+' : ''}
+            {rows.length} loaded{page.hasNext ? '+' : ' (all)'}
             {page.ms != null && <> · {page.ms} ms</>}
             {remaining != null && <> · {remaining} requests left</>}
           </p>
@@ -125,6 +142,18 @@ export default function Results({ mode, q }) {
               <Stat n={stats.issuers} l="Distinct issuers" />
             </div>
           )}
+          {countries.length > 0 && (
+            <div className="card countries">
+              <div className="countries-head"><b>By subject country</b><span className="muted small">{countries.reduce((a, [, n]) => a + n, 0)} of {rows.length} certificates looked up</span></div>
+              {countries.map(([c, n]) => (
+                <button key={c} className={`crow ${country === c ? 'on' : ''}`} onClick={() => setCountry(country === c ? 'all' : c)}>
+                  <span className="cname">{c === '—' ? 'No country (DV)' : `${countryFlag(c)} ${countryName(c)}`}</span>
+                  <span className="cbar"><i style={{ width: `${(n / countries[0][1]) * 100}%` }} /></span>
+                  <span className="cnum">{n}</span>
+                </button>
+              ))}
+            </div>
+          )}
           {rows.length > 0 && (
             <div className="toolbar">
               <input className="input" placeholder="Filter loaded results…" value={filter} onChange={(e) => setFilter(e.target.value)} />
@@ -136,6 +165,12 @@ export default function Results({ mode, q }) {
                   <option value="expired">Expired</option>
                 </select>
               )}
+              {countries.length > 0 && (
+                <select className="input select" value={country} onChange={(e) => setCountry(e.target.value)}>
+                  <option value="all">All countries</option>
+                  {countries.map(([c, n]) => <option key={c} value={c}>{c === '—' ? 'No country (DV)' : `${countryFlag(c)} ${countryName(c)}`} ({n})</option>)}
+                </select>
+              )}
             </div>
           )}
 
@@ -143,10 +178,10 @@ export default function Results({ mode, q }) {
           {rows.length > 0 && isHosts && <HostsTable rows={shown} />}
           {rows.length > 0 && isBimi && <BimiList rows={shown} />}
           {rows.length > 0 && !isHosts && !isBimi && <CertTable rows={shown} org={mode === 'org'} issuers={issuers} />}
-          {mode === 'org' && rows.length > issuerLimit && (
+          {mode !== 'hosts' && mode !== 'bimi' && rows.length > issuerLimit && (
             <div className="more">
-              <p className="muted small">Issuers are looked up one certificate at a time (1 API credit each) — {issuerLimit} of {rows.length} so far.</p>
-              <button className="btn btn-outline btn-sm" onClick={() => setIssuerLimit(rows.length)}>Look up issuer for all {rows.length}</button>
+              <p className="muted small">Country{mode === 'org' ? ' and issuer are' : ' is'} looked up one certificate at a time (1 API credit each) — {issuerLimit} of {rows.length} so far.</p>
+              <button className="btn btn-outline btn-sm" onClick={() => setIssuerLimit(rows.length)}>Look up all {rows.length}</button>
             </div>
           )}
           {rows.length > 0 && shown.length === 0 && <div className="empty">No loaded rows match your filter.</div>}
@@ -154,9 +189,16 @@ export default function Results({ mode, q }) {
           {err && <ErrorBox err={err} />}
           {page.hasNext && (
             <div className="more">
-              <button className="btn btn-primary" disabled={more} onClick={() => load(page.cursor)}>
-                {more ? 'Loading…' : 'Load more'}
-              </button>
+              {auto && !err ? (
+                <>
+                  <p className="muted small">Loading all pages… {rows.length} certificates so far.</p>
+                  <button className="btn btn-outline btn-sm" onClick={() => { stopRef.current = true; setAuto(false) }}>Stop</button>
+                </>
+              ) : (
+                <button className="btn btn-primary" disabled={more} onClick={() => { stopRef.current = false; setAuto(true); setErr(null) }}>
+                  {err ? 'Retry loading the rest' : 'Load all remaining'}
+                </button>
+              )}
             </div>
           )}
         </>
@@ -194,6 +236,13 @@ function IssuerCell({ info }) {
   return <>{cn}{isDigiCert(info.dn) && <span className="badge brand">DigiCert</span>}<div className="sub">{dnValue(info.dn, 'O')}</div></>
 }
 
+function CountryCell({ info }) {
+  if (!info) return <span className="muted small">…</span>
+  if (info.error) return <span className="muted small">n/a</span>
+  if (!info.country) return <span className="muted small" title="Domain-validated certificates carry no subject country">—</span>
+  return <span title={info.country}>{countryFlag(info.country)} {countryName(info.country)}</span>
+}
+
 function CertTable({ rows, org, issuers = {} }) {
   return (
     <div className="table-wrap">
@@ -206,6 +255,7 @@ function CertTable({ rows, org, issuers = {} }) {
             <th>Valid from</th>
             <th>Valid to</th>
             {!org && <th>Key</th>}
+            <th>Country</th>
             <th className="num">{org ? 'Domains' : 'SANs'}</th>
             <th>Serial</th>
           </tr>
@@ -215,8 +265,13 @@ function CertTable({ rows, org, issuers = {} }) {
             <tr key={r.id} className="clickrow" onClick={() => { window.location.hash = `#/c/${r.id}` }}>
               <td><StatusBadge status={r._st} /></td>
               <td className="name">
-                <a href={`#/c/${r.id}`} onClick={(e) => e.stopPropagation()}>{r.match || r.subject_cn}</a>
-                {org && r.subject_cn && r.subject_cn !== r.match && <div className="sub">{r.subject_cn}</div>}
+                <div className="namecell">
+                  <Logo domain={org ? (r.domains || [])[0] || r.subject_cn : r.match} name={r.match || r.subject_cn} />
+                  <div>
+                    <a href={`#/c/${r.id}`} onClick={(e) => e.stopPropagation()}>{r.match || r.subject_cn}</a>
+                    {org && r.subject_cn && r.subject_cn !== r.match && <div className="sub">{r.subject_cn}</div>}
+                  </div>
+                </div>
               </td>
               <td>
                 {org ? <IssuerCell info={issuers[r.id]} /> : (
@@ -229,6 +284,7 @@ function CertTable({ rows, org, issuers = {} }) {
                 <div className="sub">{r._st.key === 'expired' ? `${r._st.days}d ago` : `in ${r._st.days}d`}</div>
               </td>
               {!org && <td className="nowrap">{r.key_algo || '—'}</td>}
+              <td className="nowrap"><CountryCell info={issuers[r.id]} /></td>
               <td className="num">
                 {org ? <DomainSample r={r} /> : r.san_count ?? '—'}
               </td>
@@ -264,7 +320,7 @@ function HostsTable({ rows }) {
             const st = h.last_not_after ? certStatus(h.first_seen, h.last_not_after) : null
             return (
               <tr key={h.host}>
-                <td className="name mono">{h.host}</td>
+                <td className="name"><div className="namecell"><Logo domain={h.host} name={h.host} /><span className="mono">{h.host}</span></div></td>
                 <td className="num">{h.certs}</td>
                 <td className="nowrap">{fmtDate(h.first_seen)}</td>
                 <td className="nowrap">{fmtDate(h.last_seen)}</td>
@@ -287,7 +343,7 @@ function BimiList({ rows }) {
         return (
           <article className="card bimi" key={r.id}>
             <div className="bimi-logo">
-              {r.logo_url ? <img src={r.logo_url} alt={`${r.subject_o} logo`} loading="lazy" /> : <span className="muted small">No logo</span>}
+              {r.logo_url ? <img src={r.logo_url} alt={`${r.subject_o} logo`} loading="lazy" /> : <Logo domain={(r.domains || [])[0]} name={r.subject_o} size={64} />}
             </div>
             <div className="bimi-body">
               <div className="bimi-top">

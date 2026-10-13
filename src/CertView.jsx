@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getCert, downloadCert } from './api.js'
 import {
-  certStatus, fmtDate, lifetimeDays, parseDN, dnLabel, dnValue, isDigiCert, policyName, validationLevel, saveBlob, groupHex,
+  certStatus, fmtDate, lifetimeDays, parseDN, dnLabel, dnValue, isDigiCert, policyName, countryName, countryFlag, validationLevel, saveBlob, groupHex,
 } from './util.js'
 import { CopyBtn, StatusBadge } from './components.jsx'
+import Logo from './Logo.jsx'
 
 export default function CertView({ id }) {
   const [cert, setCert] = useState(null)
@@ -56,7 +57,7 @@ function Dn({ dn }) {
   if (!parts.length) return <p className="muted">—</p>
   return (
     <dl className="kv">
-      {parts.map((p, i) => <Row key={i} k={dnLabel(p.k)}>{p.v}</Row>)}
+      {parts.map((p, i) => <Row key={i} k={dnLabel(p.k)}>{p.k === 'C' ? `${countryFlag(p.v)} ${countryName(p.v)} (${p.v})` : p.v}</Row>)}
     </dl>
   )
 }
@@ -67,6 +68,7 @@ function Detail({ cert: c, showJson, setShowJson }) {
   const pct = Math.min(100, Math.max(0, ((Date.now() - Date.parse(c.not_before)) / (Date.parse(c.not_after) - Date.parse(c.not_before))) * 100))
   const issuerCN = dnValue(c.issuer_dn, 'CN')
   const subjO = dnValue(c.subject_dn, 'O')
+  const country = dnValue(c.subject_dn, 'C')
   const level = validationLevel(c.policy_oids)
   const [sanFilter, setSanFilter] = useState('')
   const [dl, setDl] = useState({ busy: '', err: '' })
@@ -107,8 +109,12 @@ function Detail({ cert: c, showJson, setShowJson }) {
             {isDigiCert(c.issuer_dn) && <span className="badge brand">Issued by DigiCert</span>}
             {c.is_ca && <span className="badge level">CA certificate</span>}
           </div>
-          <h2 className="cn">{c.subject_cn || subjO || 'Certificate'}</h2>
+          <div className="cn-row">
+            <Logo domain={c.subject_cn && c.subject_cn.includes('.') ? c.subject_cn : (c.san_dns || [])[0]} name={subjO || c.subject_cn} size={48} />
+            <h2 className="cn">{c.subject_cn || subjO || 'Certificate'}</h2>
+          </div>
           {subjO && <p className="banner-org">{subjO}</p>}
+          {country && <p className="banner-issuer">{countryFlag(country)} {countryName(country)}</p>}
           <p className="banner-issuer">Issued by <b>{issuerCN || c.issuer_dn}</b></p>
         </div>
         <div className="banner-days">

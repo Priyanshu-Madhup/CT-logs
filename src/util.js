@@ -97,3 +97,21 @@ export function goSearch(mode, q) {
   if (mode === 'cert') window.location.hash = `#/c/${encodeURIComponent(q.replace(/[\s:]/g, ''))}`
   else window.location.hash = `#/s/${mode}/${encodeURIComponent(q)}`
 }
+
+export function countryName(cc) {
+  try { return new Intl.DisplayNames(['en'], { type: 'region' }).of(cc.toUpperCase()) || cc } catch { return cc }
+}
+export function countryFlag(cc) {
+  return '' // flag emoji don't render on Windows; keep names only
+}
+
+// Registrable domain (approximation: handles common two-level public suffixes)
+const SLD = /^(co|com|org|net|gov|edu|ac|or|ne|go)$/
+export function baseDomain(name) {
+  const h = (name || '').toLowerCase().replace(/^\*\./, '').replace(/\.$/, '')
+  if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(h)) return ''
+  const p = h.split('.')
+  if (p.length <= 2) return h
+  const n = p[p.length - 2].length <= 3 && SLD.test(p[p.length - 2]) && p[p.length - 1].length === 2 ? 3 : 2
+  return p.slice(-n).join('.')
+}
