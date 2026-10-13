@@ -15,10 +15,11 @@ export default function Results({ mode, q }) {
   const [status, setStatus] = useState('all')
   const alive = useRef(true)
   const [issuers, setIssuers] = useState({}) // id -> { dn } | { error }
-  const [issuerLimit, setIssuerLimit] = useState(15)
+  const [issuerLimit, setIssuerLimit] = useState(0)
   const [country, setCountry] = useState('all')
   const fetching = useRef(new Set())
-  const [auto, setAuto] = useState(true)   // keep fetching pages until exhausted
+  const started = useRef(false)
+  const [auto, setAuto] = useState(false)  // fetch every remaining page (opt-in: costs one request per page)
   const stopRef = useRef(false)
 
   const load = async (after) => {
@@ -46,7 +47,7 @@ export default function Results({ mode, q }) {
 
   useEffect(() => {
     alive.current = true
-    load()
+    if (!started.current) { started.current = true; load() } // guard against the dev-mode double effect
     return () => { alive.current = false }
   }, [])
 
@@ -62,6 +63,7 @@ export default function Results({ mode, q }) {
     rows.slice(0, issuerLimit).forEach((r) => {
       if (fetching.current.has(r.id)) return
       fetching.current.add(r.id)
+      setIssuers((p) => ({ ...p, [r.id]: { loading: true } }))
       getCert(r.id)
         .then(({ data }) => alive.current && setIssuers((p) => ({ ...p, [r.id]: { dn: data.issuer_dn, country: dnValue(data.subject_dn, 'C') } })))
         .catch(() => alive.current && setIssuers((p) => ({ ...p, [r.id]: { error: true } })))
@@ -179,8 +181,12 @@ export default function Results({ mode, q }) {
           {rows.length > 0 && isBimi && <BimiList rows={shown} />}
           {rows.length > 0 && !isHosts && !isBimi && <CertTable rows={shown} org={mode === 'org'} issuers={issuers} />}
           {mode !== 'hosts' && mode !== 'bimi' && rows.length > issuerLimit && (
-            <div className="more">
-              <p className="muted small">Country{mode === 'org' ? ' and issuer are' : ' is'} looked up one certificate at a time (1 API credit each) — {issuerLimit} of {rows.length} so far.</p>
+            <div className="more lookup">
+              <p className="muted small">
+                Country{mode === 'org' ? ' and issuer are' : ' is'} not in the search results; each lookup is one extra API request
+                ({Math.min(issuerLimit, rows.length)} of {rows.length} done).
+              </p>
+              {issuerLimit < 15 && rows.length > 15 && <button className="btn btn-outline btn-sm" onClick={() => setIssuerLimit(15)}>Look up first 15</button>}{' '}
               <button className="btn btn-outline btn-sm" onClick={() => setIssuerLimit(rows.length)}>Look up all {rows.length}</button>
             </div>
           )}
@@ -195,9 +201,14 @@ export default function Results({ mode, q }) {
                   <button className="btn btn-outline btn-sm" onClick={() => { stopRef.current = true; setAuto(false) }}>Stop</button>
                 </>
               ) : (
-                <button className="btn btn-primary" disabled={more} onClick={() => { stopRef.current = false; setAuto(true); setErr(null) }}>
-                  {err ? 'Retry loading the rest' : 'Load all remaining'}
-                </button>
+                <>
+                  <button className="btn btn-primary" disabled={more} onClick={() => { setErr(null); load(page.cursor) }}>
+                    {more ? 'Loading…' : err ? 'Retry' : 'Load more'}
+                  </button>{' '}
+                  <button className="btn btn-outline" disabled={more} onClick={() => { stopRef.current = false; setAuto(true); setErr(null) }}>
+                    Load all remaining
+                  </button>
+                </>
               )}
             </div>
           )}
@@ -230,7 +241,8 @@ function Skeleton() {
 }
 
 function IssuerCell({ info }) {
-  if (!info) return <span className="muted small">Loading…</span>
+  if (!info) return <span className="muted small" title="Use “Look up” below the table">—</span>
+  if (info.loading) return <span className="muted small">Loading…</span>
   if (info.error) return <span className="muted small">Unavailable</span>
   const cn = dnValue(info.dn, 'CN') || info.dn
   return (
@@ -242,7 +254,8 @@ function IssuerCell({ info }) {
 }
 
 function CountryCell({ info }) {
-  if (!info) return <span className="muted small">…</span>
+  if (!info) return <span className="muted small" title="Use “Look up” below the table">—</span>
+  if (info.loading) return <span className="muted small">…</span>
   if (info.error) return <span className="muted small">n/a</span>
   if (!info.country) return <span className="muted small" title="Domain-validated certificates carry no subject country">—</span>
   return <span title={info.country}>{countryFlag(info.country)} {countryName(info.country)}</span>
