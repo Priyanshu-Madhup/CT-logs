@@ -284,7 +284,7 @@ function CertTable({ rows, org, issuers = {} }) {
               <td><StatusBadge status={r._st} /></td>
               <td className="name">
                 <div className="namecell">
-                  <Logo domain={org ? (r.domains || [])[0] || r.subject_cn : r.match} name={r.match || r.subject_cn} />
+                  <Logo domain={org ? [...(r.domains || []), r.subject_cn] : r.match} name={r.match || r.subject_cn} />
                   <div>
                     <a href={`#/c/${r.id}`} onClick={(e) => e.stopPropagation()}>{r.match || r.subject_cn}</a>
                     {org && r.subject_cn && r.subject_cn !== r.match && <div className="sub">{r.subject_cn}</div>}
@@ -364,7 +364,7 @@ function BimiList({ rows }) {
         return (
           <article className="card bimi" key={r.id}>
             <div className="bimi-logo">
-              {r.logo_url ? <img src={r.logo_url} alt={`${r.subject_o} logo`} loading="lazy" /> : <Logo domain={(r.domains || [])[0]} name={r.subject_o} size={64} />}
+              {r.logo_url ? <img src={r.logo_url} alt={`${r.subject_o} logo`} loading="lazy" /> : <Logo domain={r.domains} name={r.subject_o} size={64} />}
             </div>
             <div className="bimi-body">
               <div className="bimi-top">

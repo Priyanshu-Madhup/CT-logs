@@ -105,14 +105,15 @@ export function countryFlag(cc) {
   return '' // flag emoji don't render on Windows; keep names only
 }
 
-// Registrable domain (approximation: handles common two-level public suffixes)
-const SLD = /^(co|com|org|net|gov|edu|ac|or|ne|go)$/
+// Registrable domain (approximation): treats common second-level registries under a country TLD
+// (co.uk, com.au, bank.in, gov.in ...) as part of the suffix.
+const SLD = /^(co|com|org|net|gov|edu|ac|or|ne|go|mil|nic|res|bank|firm|gen|ind|sch|ltd|plc|nhs|police)$/
 export function baseDomain(name) {
   const h = (name || '').toLowerCase().replace(/^\*\./, '').replace(/\.$/, '')
   if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(h)) return ''
   const p = h.split('.')
   if (p.length <= 2) return h
-  const n = p[p.length - 2].length <= 3 && SLD.test(p[p.length - 2]) && p[p.length - 1].length === 2 ? 3 : 2
+  const n = p[p.length - 1].length === 2 && SLD.test(p[p.length - 2]) ? 3 : 2
   return p.slice(-n).join('.')
 }
 
