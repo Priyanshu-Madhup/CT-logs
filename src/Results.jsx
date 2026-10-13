@@ -69,6 +69,7 @@ export default function Results({ mode, q }) {
     })
   }, [rows, issuerLimit, mode])
 
+  const orgGroups = useMemo(() => (mode === 'org' ? groupOrgDomains(rows) : {}), [rows, mode])
   const isHosts = mode === 'hosts'
   const isBimi = mode === 'bimi'
 
@@ -90,9 +91,20 @@ export default function Results({ mode, q }) {
     return { ...c, issuers: issuers.size }
   }, [enriched, isHosts, isBimi])
 
-  const orgGroups = useMemo(() => (mode === 'org' ? groupOrgDomains(rows) : {}), [rows, mode])
 
   const certMode = !isHosts && !isBimi
+  // Logo for the page title: the queried domain, or for an organisation search its most common domains.
+  const head = useMemo(() => {
+    if (mode === 'subdomains' || mode === 'domain' || mode === 'hosts') return { domain: q }
+    if (mode === 'org' && rows.length) {
+      const cnt = {}
+      rows.forEach((r) => { const k = orgKey(r.match || r.subject_cn); cnt[k] = (cnt[k] || 0) + 1 })
+      const top = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0]?.[0]
+      return { domain: orgGroups[top], group: top }
+    }
+    if (mode === 'bimi') return { domain: /\./.test(q) ? q : rows[0]?.domains }
+    return {}
+  }, [mode, q, rows, orgGroups])
   const items = useMemo(() => (certMode ? buildItems(enriched, issuers, mode === 'org') : []), [enriched, issuers, mode, certMode])
   const filtered = useMemo(() => applyFilters(items, f), [items, f])
   const hasLookup = items.some((i) => i.m.country !== undefined)
@@ -107,7 +119,10 @@ export default function Results({ mode, q }) {
       <div className="results-head">
         <div>
           <p className="eyebrow dark">{MODES[mode].label}</p>
-          <h2 className="results-title">{q}</h2>
+          <div className="namecell title-row">
+            {head.domain && <Logo domain={head.domain} group={head.group} name={q} size={44} />}
+            <h2 className="results-title">{mode === 'org' ? q.toUpperCase() : q}</h2>
+          </div>
         </div>
         {state === 'done' && (
           <p className="muted small">
